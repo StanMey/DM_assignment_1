@@ -37,7 +37,7 @@ class Tree:
         :type minleaf: int
         :param nfeat: Minimal number of features considered for each
         :type nfeat: int
-        """        
+        """
         # initialize the root
         self.root = None
 
@@ -45,8 +45,9 @@ class Tree:
         self.nmin = nmin
         self.minleaf = minleaf
         self.nfeat = nfeat
+
     
-    def build_tree(self, features, labels) -> Node:
+    def build_tree(self, features, labels):
         
         n_samples, n_features = features.shape
 
@@ -63,12 +64,23 @@ class Tree:
         parent_gain = gini_index(labels)
         _, feature_idx, threshold = self.find_best_split(features_idx, features, labels, parent_gain)
         print(feature_idx, threshold)
-
-        # go down one branch and create the child nodes
         
-        # left_branch = self.build_tree()
-        # right_branch = self.build_tree()
-        # return Node(,, left_branch, right_branch)
+        if not feature_idx:
+            # the minleaf constraint was violated, so make this Node a leaf node
+            leaf_value = self._find_most_common(labels)
+            return Node(value=leaf_value)
+
+        # select the features for both
+        left_idxs = np.argwhere(features[:, feature_idx].flatten() <= threshold).flatten()
+        right_idxs = np.argwhere(features[:, feature_idx].flatten() > threshold).flatten()
+
+        left_features, left_labels = features[left_idxs], labels[left_idxs]
+        right_features, right_labels = features[right_idxs], labels[right_idxs]
+        
+        # go down one branch and create the child nodes
+        left_branch = self.build_tree(left_features, left_labels)
+        right_branch = self.build_tree(right_features, right_labels)
+        return Node(feature_idx, threshold, left_branch, right_branch)
 
 
     def find_best_split(self, features_idx, features, labels, p_gain):
@@ -93,10 +105,18 @@ class Tree:
                 info_gain = p_gain - (left_gain * (len(left_labels) / len(labels)) + right_gain * (len(right_labels) / len(labels)))
 
                 # save the information gain
-                gains.append((info_gain, feature_id, threshold))
+                gains.append((info_gain, feature_id, threshold, len(left_labels), len(right_labels)))
         
-        return sorted(gains, key=lambda x: x[0], reverse=True)[0]
+        # filter the gains for the minleaf requirement
+        gains = [x[:3] for x in gains if x[3] >= self.minleaf and x[4] >= self.minleaf]
+        sorted_gains = sorted(gains, key=lambda x: x[0], reverse=True)
 
+        if sorted_gains:
+            # there is a split that meets the minleaf constraint
+            return sorted_gains[0]
+        else:
+            # there is no split that meets the minleaf constraint
+            return None, None, None
 
 
     def _find_most_common(self, labels):
@@ -145,14 +165,29 @@ def tree_pred(x: np.ndarray, tr: Tree) -> np.ndarray:
     :return: Vector of predicted class labels for the cases in x, where y[i] is the predicted class label for x[i].
     :rtype: np.ndarray
     """
-    ...
+    predictions = []
+
+    for features in x:
+        current_node = tr.root
+
+        while not current_node.value:
+            # as long as the current node doesn't have a value, just continue down the rabbit hole
+            if features[current_node.feature_index] <= current_node.threshold:
+                current_node = current_node.left
+            else:
+                current_node = current_node.right
+        
+        # we have found a leaf node so now store the value
+        predictions.append(current_node.value)
+    
+    return np.array(predictions)
 
 
 ##### The two auxiliary functions (for bagging and random forest) #####
 
 
 if __name__ == "__main__":
-    data = np.loadtxt('./data/credit.txt', delimiter=",", skiprows=1)
+    data = np.loadtxt('./data/credit.txt', delimiter=",")
     
     X = data[:,:-1]
     y = data[:, -1].astype(int)
