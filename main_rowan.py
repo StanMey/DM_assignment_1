@@ -53,43 +53,36 @@ def best_split(x: np.ndarray, y: np.ndarray, minleaf: int)-> dict:
     split = {}
     lowest_impurity = 0
     x = np.column_stack((x, y.T))
+
     for index in range(x.shape[1]):
         features = x[:, index]
         features = np.unique(features)
         
         for threshold in features:
+
             data_left=x[x[:,0]>threshold]
             data_right = x[x[:,0]<=threshold]
-
-
 
             # print(data_left.shape[0], data_right.shape[0])
             if data_left.shape[0]>=minleaf and data_right.shape[0]>=minleaf:
                 y, y_left, y_right = x[:,-1], data_left[:,-1], data_right[:,-1]
-                #calculate impurity
-                impurity = quality_of_split(y, y_left, y_right)
-                print("index, thres, impurity",index, threshold, impurity)
 
-                if impurity > lowest_impurity:
-                    print("dat: ", x, index, threshold, "data left:", data_left,"data right", data_right)
+                info_gain = quality_of_split(y, y_left, y_right)
+                #print("index, thres, impurity",index, threshold, info_gain)
+
+                if info_gain > lowest_impurity:
+                    #print("dat: ", x, index, threshold, "data left:", data_left,"data right", data_right)
                     split["index"] = index
                     split["value"] = threshold
-                    split["quality"] = impurity
+                    split["quality"] = info_gain
                     split["impurity"] = gini_index(y)
                     split["left"] = data_left
                     split["right"] = data_right
                     split["left_y"] = y_left
                     split["right_y"] = y_right
-                    lowest_impurity = impurity
+                    lowest_impurity = info_gain
     return split
 
-
-
-
-##### The two auxiliary functions (for bagging and random forest) #####
-
-
-##### The Tree object #####
 
 def gini_index(y: np.ndarray) -> float:
     """Two-class gini index impurity measure, i.e.: i(t) = p(0|t)p(1|t) = p(0|t)(1-p(0|t)).
@@ -100,12 +93,12 @@ def gini_index(y: np.ndarray) -> float:
     :rtype: float
     """
     _, counts = np.unique(y, return_counts=True)
-    #print(counts)
     counts= counts/len(y)
 
     if len(counts)==1:
         return 0
     else: return counts[0]*counts[1]
+
 def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
     weight_left=len(y_left)/len(y)
     weight_right=len(y_right)/len(y)
@@ -117,8 +110,10 @@ def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
 class Tree:
     def __init__(self):
         self.root =None
+        
     def run(self, x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int):
         self.root = tree_grow(x, y, nmin, minleaf, nfeat)
+
     def print_tree(self, tree=None):
         if not tree:
             tree=self.root
