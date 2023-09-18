@@ -1,5 +1,5 @@
 from typing import List
-
+from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
 
 
@@ -20,19 +20,24 @@ def tree_grow(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int)
     :return: Grown and fertilized tree predicting new cases.
     :rtype: Tree
     """
-    sample_size, feature_size = np.shape(x)
+    instances, _ = np.shape(x)
 
-    if sample_size >= nmin:
+    if instances >= nmin:
+
         split = best_split(x, y, minleaf)
-        if split["quality"] < 0:
+        if split["quality"] > 0:
             left_tree = tree_grow(split["left"], split["left_y"], nmin, minleaf, nfeat)
-            right_tree = tree_grow(split["left"], split["left_y"], nmin, minleaf, nfeat)
+            right_tree = tree_grow(split["right"], split["right_y"], nmin, minleaf, nfeat)
             return Node(feature=split["index"], threshold=split["value"],
-                        left_node=left_tree, right_node=right_tree, impurity=split["impurity"])
+                        left_node=left_tree, right_node=right_tree, impurity=split["impurity"], info_gain=split["quality"])
 
     y = list(y)
-    leaf_value = max(y, key=y.count)
-    return Node(value=leaf_value)
+    leaf_value = 2
+    if (y.count(0) > y.count(1)):
+        return Node(value= 0)
+    else: return Node(value= 1)
+
+
 
 
 def tree_pred(x: np.ndarray, tr) -> np.ndarray:
@@ -45,31 +50,48 @@ def tree_pred(x: np.ndarray, tr) -> np.ndarray:
     :return: Vector of predicted class labels for the cases in x, where y[i] is the predicted class label for x[i].
     :rtype: np.ndarray
     """
-    ...
+    pred_list = []
+    for instance in x:
+        pred_list.append(predict(instance, tr))
+    return np.asarray(pred_list)
+        
+        
+
+
+def predict(instance: np.ndarray, tr) -> float:
+
+    if tr.value != None: return tr.value
+
+    value = instance[tr.feature]
+    if value > tr.threshold:
+        return predict(instance, tr.left_node)
+    else: return predict(instance, tr.right_node)
+
 
 
 def best_split(x: np.ndarray, y: np.ndarray, minleaf: int) -> dict:
     split = {}
-    best_gain = 1
+    best_gain = -1
     x = np.column_stack((x, y.T))
-    for index in range(x.shape[1]):
+
+    for index in range(x.shape[1]-1):
         features = x[:, index]
         features = np.unique(features)
+        features = [np.mean(features[i:i+2]) for i in range(0, len(features)-1)]
 
         for threshold in features:
-            data_left = x[x[:, 0] > threshold]
-            data_right = x[x[:, 0] <= threshold]
 
-            # print(data_left.shape[0], data_right.shape[0])
+            data_left = x[x[:, index] > threshold]
+            data_right = x[x[:, index] <= threshold]
+
             if data_left.shape[0] >= minleaf and data_right.shape[0] >= minleaf:
+
                 y, y_left, y_right = x[:, -1], data_left[:, -1], data_right[:, -1]
-
                 info_gain = quality_of_split(y, y_left, y_right)
-                # print("index, thres, impurity",index, threshold, info_gain)
+                data_left = data_left[:,:-1]
+                data_right = data_right[:,:-1]
 
-                print(info_gain)
-                if info_gain < best_gain:
-                    #print("dat: ", x, index, threshold, "data left:", data_left,"data right", data_right)
+                if info_gain > best_gain:
                     split["index"] = index
                     split["value"] = threshold
                     split["quality"] = info_gain
@@ -103,9 +125,8 @@ def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
     weight_left = len(y_left) / len(y)
     weight_right = len(y_right) / len(y)
 
-    print("weights", weight_left, gini_index(y_left), weight_right, gini_index(y_right))
-
-    return gini_index(y) - (weight_left * gini_index(y_left) + weight_right * gini_index(y_right))
+    gain = gini_index(y) - (weight_left * gini_index(y_left) + weight_right * gini_index(y_right))
+    return gain
 
 
 class Tree:
@@ -122,39 +143,50 @@ class Tree:
         if tree.value is not None:
             print(tree.value)
         else:
-            print("X" + str(tree.feature), "<=", tree.threshold, "!", tree.impurity)
-            print("left ")
+            print("feature " + str(tree.feature), " | threshold: <=", tree.threshold, "| gini value: ", tree.impurity)
+            print("left node:")
             self.print_tree(tree.left_node)
-            print("right")
+            print("right node:")
             self.print_tree(tree.right_node)
 
 
+
 class Node:
-    def __init__(self, feature=None, threshold=None, left_node=None, right_node=None, impurity=None, value=None):
+    def __init__(self, feature=None, threshold=None, left_node=None, right_node=None, impurity=None, info_gain=None, value=None):
         self.feature = feature
         self.threshold = threshold
         self.left_node = left_node
         self.right_node = right_node
         self.impurity = impurity
+        self.info_gain = info_gain
         self.value = value
 
 
-data = [[22, 0, 0, 28, 1, 0],
-        [46, 0, 1, 32, 0, 0],
-        [24, 1, 1, 24, 1, 1],
-        [25, 0, 0, 27, 1, 1]]
-# [29,1,1,32,0,0],
-# [45,1,1,30,0,1],
-# [63,1,1,58,1,1],
-# [36,1,0,52,1,1],
-# [23,0,1,40,0,1],
-# [50,1,1,28,0,1]]
-data = np.asarray(data)
+def read_data(text_file: str):
+    data = []
+    with open(text_file, 'r') as file:
+        for line in file:
 
+            row = line.strip().split(',')
+            row = [int(row[0])] + [float(elem) for elem in row[1:]]
+            data.append(row)
+
+    return np.asarray(data)
+
+data = read_data('data/pima.txt')
+#data = read_data('data/credit.txt')
+
+x = np.delete(data, np.s_[-1:], axis=1)
 y = data[:, -1]
-data = np.delete(data, np.s_[-1:], axis=1)
-print(data, y)
 
+# create tree object
 tree = Tree()
-tree.run(data, y, 2, 1, 5)
+
+# run it
+tree.run(x, y, 20, 5, 8)
 tree.print_tree()
+
+#make predictions
+preds = tree_pred(data, tree.root)
+
+print(confusion_matrix(y, preds))
