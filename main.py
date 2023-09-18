@@ -28,7 +28,16 @@ def gini_index(t: np.ndarray) -> float:
 
 
 class Tree:
-    def __init__(self, nmin, minleaf, nfeat):
+    def __init__(self, nmin: int, minleaf: int, nfeat: int) -> None:
+        """Initialisation of Tree object.
+
+        :param nmin: Number of observations that a node must contain at least, for it to be allowed to split.
+        :type nmin: int
+        :param minleaf: Minimum number of observations required for a leaf node.
+        :type minleaf: int
+        :param nfeat: Minimal number of features considered for each
+        :type nfeat: int
+        """        
         # initialize the root
         self.root = None
 
@@ -37,7 +46,7 @@ class Tree:
         self.minleaf = minleaf
         self.nfeat = nfeat
     
-    def build_tree(self, features, labels):
+    def build_tree(self, features, labels) -> Node:
         
         n_samples, n_features = features.shape
 
