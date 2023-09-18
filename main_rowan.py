@@ -25,8 +25,7 @@ def tree_grow(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int)
     sample_size, feature_size = np.shape(x)
     if sample_size >= nmin:
         split = best_split(x, y, minleaf) 
-
-        if split["quality"] > 0:
+        if split["quality"] < 0:
             left_tree = tree_grow(split["left"], split["left_y"], nmin, minleaf, nfeat)
             right_tree = tree_grow(split["left"], split["left_y"], nmin, minleaf, nfeat)
             return Node(feature=split["index"], threshold=split["value"], left_node=left_tree, right_node=right_tree,impurity=split["impurity"])
@@ -51,26 +50,27 @@ def tree_pred(x: np.ndarray, tr) -> np.ndarray:
 
 def best_split(x: np.ndarray, y: np.ndarray, minleaf: int)-> dict:
     split = {}
-    lowest_impurity = 0
+    best_gain = 1
     x = np.column_stack((x, y.T))
-
     for index in range(x.shape[1]):
         features = x[:, index]
         features = np.unique(features)
         
         for threshold in features:
-
+            print(index, threshold)
             data_left=x[x[:,0]>threshold]
             data_right = x[x[:,0]<=threshold]
-
+            print(data_left, data_right)
             # print(data_left.shape[0], data_right.shape[0])
             if data_left.shape[0]>=minleaf and data_right.shape[0]>=minleaf:
+                print()
                 y, y_left, y_right = x[:,-1], data_left[:,-1], data_right[:,-1]
 
                 info_gain = quality_of_split(y, y_left, y_right)
                 #print("index, thres, impurity",index, threshold, info_gain)
 
-                if info_gain > lowest_impurity:
+                print(info_gain)
+                if info_gain < best_gain:
                     #print("dat: ", x, index, threshold, "data left:", data_left,"data right", data_right)
                     split["index"] = index
                     split["value"] = threshold
@@ -80,7 +80,7 @@ def best_split(x: np.ndarray, y: np.ndarray, minleaf: int)-> dict:
                     split["right"] = data_right
                     split["left_y"] = y_left
                     split["right_y"] = y_right
-                    lowest_impurity = info_gain
+                    best_gain = info_gain
     return split
 
 
@@ -102,7 +102,7 @@ def gini_index(y: np.ndarray) -> float:
 def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
     weight_left=len(y_left)/len(y)
     weight_right=len(y_right)/len(y)
-    print("weights",weight_left, gini_index(y_left), weight_right,gini_index(y_right))
+    #print("weights",weight_left, gini_index(y_left), weight_right,gini_index(y_right))
     return gini_index(y)-(weight_left*gini_index(y_left)+weight_right*gini_index(y_right))
 
 
@@ -110,7 +110,7 @@ def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
 class Tree:
     def __init__(self):
         self.root =None
-        
+
     def run(self, x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int):
         self.root = tree_grow(x, y, nmin, minleaf, nfeat)
 
@@ -141,14 +141,14 @@ class Node:
 
 data = [[22,0,0,28,1,0],
 [46,0,1,32,0,0],
-[24,1,1,24,1,1],
-[25,0,0,27,1,1]]
-# [29,1,1,32,0,0],
-# [45,1,1,30,0,1],
-# [63,1,1,58,1,1],
-# [36,1,0,52,1,1],
-# [23,0,1,40,0,1],
-# [50,1,1,28,0,1]]
+[24,1,1,24,1,0],
+[25,0,0,27,1,0],
+[29,1,1,32,0,0],
+[45,1,1,30,0,1],
+[63,1,1,58,1,1],
+[36,1,0,52,1,1],
+[23,0,1,40,0,1],
+[50,1,1,28,0,1]]
 data = np.asarray(data)
 
 y = data[:,-1]
