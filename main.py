@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import List
 
 import numpy as np
@@ -5,17 +6,23 @@ import numpy as np
 
 ##### The Tree object #####
 
-def gini_index(t: List) -> float:
+def gini_index(t: np.ndarray) -> float:
     """Two-class gini index impurity measure, i.e.: i(t) = p(0|t)p(1|t) = p(0|t)(1-p(0|t)).
 
-    :param t: List of 2 values containing the counts for each class.
-    :type t: List
+    :param t: Array containing the labels for which the gini index has to be calculated.
+    :type t: np.ndarray
     :return: Gini index of given input y.
     :rtype: float
     """
-    population_size = np.sum(t)
-    t1_freq = t[0] / population_size
-    t2_freq = t[1] / population_size
+    counter = np.bincount(t)
+    if counter.shape[0] == 1:
+        # we only have one unique label so add a 0 so the gini index gets calculated the right way
+        counter = np.append(counter, [0])
+
+    population_size = np.sum(counter)
+
+    t1_freq = counter[0] / population_size
+    t2_freq = counter[1] / population_size
 
     return t1_freq * t2_freq
 
@@ -37,37 +44,59 @@ class Tree:
         # check the stopping criteria (nmin)
         if n_samples < self.nmin:
             # the node contains not enough observations to split so becomes a leaf Node
-            leaf_value = np.bincount(labels).argmax()
+            leaf_value = self._find_most_common(labels)
             return Node(value=leaf_value)
         
         # set the number of features to be used for this choice
         features_idx = np.random.choice(np.arange(0, n_features), self.nfeat, replace=False)
 
         # find the best split
-        parent_gain = gini_index(np.bincount(labels))
-        self.find_best_split(features_idx, features, labels, parent_gain)
+        parent_gain = gini_index(labels)
+        _, feature_idx, threshold = self.find_best_split(features_idx, features, labels, parent_gain)
+        print(feature_idx, threshold)
 
         # go down one branch and create the child nodes
-        left_branch = self.build_tree()
-        right_branch = self.build_tree()
-        return Node(,, left_branch, right_branch)
+        
+        # left_branch = self.build_tree()
+        # right_branch = self.build_tree()
+        # return Node(,, left_branch, right_branch)
 
 
     def find_best_split(self, features_idx, features, labels, p_gain):
         gains = []
+
         for feature_id in features_idx:
             # retrieve for each feature all unique values to get the possible thresholds
-            unique_values = np.unique(features[:,feature_id])
-            possible_thresholds = [np.mean(unique_values[i:i+2]) for i in range(0, len(unique_values)-2)]
+            unique_values = np.sort(np.unique(features[:,feature_id]))
+            thresholds = [np.mean(unique_values[i:i+2]) for i in range(0, len(unique_values)-1)]
 
-            for threshold in possible_thresholds:
-                # for each threshold, divide the dataset and calculate the information gain
-                
+            for threshold in thresholds:
+                # for each threshold, select the corresponding labels and divide the dataset
+                left_idxs = np.argwhere(features[:, feature_id].flatten() <= threshold).flatten()
+                right_idxs = np.argwhere(features[:, feature_id].flatten() > threshold).flatten()
 
+                left_labels = labels[left_idxs]
+                right_labels = labels[right_idxs]
+
+                # calculate the information gain
+                left_gain = gini_index(left_labels)
+                right_gain = gini_index(right_labels)
+                info_gain = p_gain - (left_gain * (len(left_labels) / len(labels)) + right_gain * (len(right_labels) / len(labels)))
+
+                # save the information gain
+                gains.append((info_gain, feature_id, threshold))
+        
+        return sorted(gains, key=lambda x: x[0], reverse=True)[0]
+
+
+
+    def _find_most_common(self, labels):
+        counter = Counter(labels)
+        return counter.most_common(1)[0][0]
 
 
 class Node:
-    def __init__(self, feature: int=None, threshold: float=None, left: Node=None, right: Node=None, value: str=None):
+    def __init__(self, feature: int=None, threshold: float=None, left=None, right=None, value: str=None):
         self.feature_index = feature
         self.threshold = threshold
         self.left = left
@@ -117,5 +146,6 @@ if __name__ == "__main__":
     data = np.loadtxt('./data/credit.txt', delimiter=",", skiprows=1)
     
     X = data[:,:-1]
-    y = data[:, -1]
-    print(y)
+    y = data[:, -1].astype(int)
+    
+    tree = tree_grow(X, y, 2, 1, X.shape[1])
