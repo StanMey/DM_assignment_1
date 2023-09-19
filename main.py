@@ -236,7 +236,62 @@ def tree_pred(x: np.ndarray, tr: Tree) -> np.ndarray:
 
 
 ##### The two auxiliary functions (for bagging and random forest) #####
+def tree_grow_b(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int, m: int) -> List[Tree]:
+    """Grows a m trees using either the bagging or random forest approach.
 
+    :param x: 2-dimensional data matrix containing attribute values.
+    :type x: np.ndarray
+    :param y: Vector of class labels.
+    :type y: np.ndarray
+    :param nmin: Number of observations that a node must contain at least, for it to be allowed to split.
+    :type nmin: int
+    :param minleaf: Minimum number of observations required for a leaf node.
+    :type minleaf: int
+    :param nfeat: Minimal number of features considered for each.
+    :type nfeat: int
+    :param nfeat: The number of bootstrapped samples to be drawn.
+    :type nfeat: int
+    :return: Grown and fertilized trees predicting new cases.
+    :rtype: List[Tree]
+    """
+    trees = []
+
+    for _ in range(m):
+        # each iteration we draw a sample with replacement from the training set (the same size as the training set)
+        new_sample = np.random.choice(np.arange(0, x.shape[0]), x.shape[0], replace=True)
+
+        # select the correct features and labels
+        sample_feat = x[new_sample]
+        sample_labels = y[new_sample]
+
+        # train a tree and save it
+        trees.append(tree_grow(sample_feat, sample_labels, nmin, minleaf, nfeat))
+    
+    # return all trees
+    return trees
+
+
+def tree_pred_b(x: np.ndarray, tr: List[Tree]) -> np.ndarray:
+    """Makes new predictions based on a grown trees.
+
+    :param x: 2-dimensional data matrix containing attribute values.
+    :type x: np.ndarray
+    :param tr: Grown trees generated with the tree_grow_b function.
+    :type tr: List[Tree]
+    :return: Vector of predicted class labels for the cases in x, where y[i] is the predicted class label for x[i].
+    :rtype: np.ndarray
+    """
+    predictions = []
+
+    # get all predictions for each tree
+    for tree in tr:
+
+        trees_pred = tree_pred(x, tree)
+        predictions.append(trees_pred)
+
+    # select the majority vote, by getting the majority vote based on the column
+    predictions = [np.argmax(np.bincount(x)) for x in np.array(predictions).T]
+    return np.array(predictions)
 
 
 if __name__ == "__main__":
@@ -246,12 +301,22 @@ if __name__ == "__main__":
     # y = data[:, -1].astype(int)
     # tree = tree_grow(X, y, 2, 1, X.shape[1])
 
-    # check on prima dataset
+    # check on prima dataset with single tree
+    # data = np.loadtxt('./data/pima.txt', delimiter=",")
+    # X = data[:,:-1]
+    # y = data[:, -1].astype(int)
+    # tree = tree_grow(X, y, 20, 5, X.shape[1])
+
+    # # make the predictions
+    # preds = tree_pred(X, tree)
+    # print(confusion_matrix(y, preds))
+
+    # check on prima dataset with random forests
     data = np.loadtxt('./data/pima.txt', delimiter=",")
     X = data[:,:-1]
     y = data[:, -1].astype(int)
-    tree = tree_grow(X, y, 20, 5, X.shape[1])
+    trees = tree_grow_b(X, y, 20, 5, X.shape[1], 10)
 
     # make the predictions
-    preds = tree_pred(X, tree)
+    preds = tree_pred_b(X, trees)
     print(confusion_matrix(y, preds))
