@@ -97,7 +97,7 @@ class Tree:
         if n_samples < self.nmin or parent_gain <= 0.0:
             # the node contains not enough observations to split or is already perfectly split, so becomes a leaf Node
             leaf_value = self._find_most_common(labels)
-            return Node(value=leaf_value)
+            return Node(value=leaf_value, depth=depth)
         
         # set the number of features to be used for this choice
         features_idx = np.random.choice(np.arange(0, n_features), self.nfeat, replace=False)
@@ -108,7 +108,7 @@ class Tree:
         if feature_idx is None:
             # the minleaf constraint was violated, so make this Node a leaf node
             leaf_value = self._find_most_common(labels)
-            return Node(value=leaf_value)
+            return Node(value=leaf_value, depth=depth)
 
         # select the features for both
         left_idxs = np.argwhere(features[:, feature_idx].flatten() <= threshold).flatten()
@@ -118,9 +118,9 @@ class Tree:
         right_features, right_labels = features[right_idxs], labels[right_idxs]
         
         # go down one branch and create the child nodes
-        left_branch = self.build_tree(left_features, left_labels)
-        right_branch = self.build_tree(right_features, right_labels)
-        return Node(feature_idx, threshold, left_branch, right_branch)
+        left_branch = self.build_tree(left_features, left_labels, depth + 1)
+        right_branch = self.build_tree(right_features, right_labels, depth + 1)
+        return Node(feature_idx, threshold, left_branch, right_branch, depth)
 
 
     def find_best_split(self, features_idx: np.ndarray, features: np.ndarray, labels: np.ndarray, p_gain: float) -> Union[Tuple[float, int, float], Tuple[None, None, None]]:
