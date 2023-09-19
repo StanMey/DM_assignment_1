@@ -20,11 +20,11 @@ def tree_grow(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int)
     :return: Grown and fertilized tree predicting new cases.
     :rtype: Tree
     """
-    instances, _ = np.shape(x)
+    instances, n_features = np.shape(x)
 
     if instances >= nmin:
-
-        split = best_split(x, y, minleaf)
+        feature_idx = np.random.choice(np.arange(0, n_features), nfeat, replace=False)
+        split = best_split(x, y, minleaf, feature_idx)
         if split["quality"] > 0:
             left_tree = tree_grow(split["left"], split["left_y"], nmin, minleaf, nfeat)
             right_tree = tree_grow(split["right"], split["right_y"], nmin, minleaf, nfeat)
@@ -32,13 +32,9 @@ def tree_grow(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int)
                         left_node=left_tree, right_node=right_tree, impurity=split["impurity"], info_gain=split["quality"])
 
     y = list(y)
-    leaf_value = 2
     if (y.count(0) > y.count(1)):
         return Node(value= 0)
     else: return Node(value= 1)
-
-
-
 
 def tree_pred(x: np.ndarray, tr) -> np.ndarray:
     """Makes new predictions based on a grown tree.
@@ -51,30 +47,52 @@ def tree_pred(x: np.ndarray, tr) -> np.ndarray:
     :rtype: np.ndarray
     """
     pred_list = []
-    for instance in x:
-        pred_list.append(predict(instance, tr))
+    if x.ndim == 1:
+        pred_list.append(predict(x, tr))
+    else:
+        for instance in x:
+            pred_list.append(predict(instance, tr))
     return np.asarray(pred_list)
-        
-        
 
+def tree_grow_b(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int, m: int):
+    tree_list = []
+    x_y = np.column_stack((x, y.T))
+    for i in range(m):
+        tree = Tree()
+        sampled_indices = np.random.choice(x.shape[0], x.shape[0], replace=True)
+        new_x = x_y[sampled_indices, :]
+        new_x = new_x[:,:-1]
+        new_y = x_y[:, -1]
 
+        tree.run(new_x, new_y, nmin, minleaf, nfeat)
+        tree_list.append(tree)
+    return tree_list
+
+def tree_pred_b(x: np.ndarray, tree_lst: list):
+    all_preds=[]
+    for instance in x:
+        preds_forrest = []
+        for tree in tree_lst:
+            preds_forrest.append(tree_pred(instance, tree.root))
+        if (preds_forrest.count(0) > preds_forrest.count(1)):
+            all_preds.append(0)
+        else: all_preds.append(1)
+    return np.asarray(all_preds)
+   
 def predict(instance: np.ndarray, tr) -> float:
 
     if tr.value != None: return tr.value
-
     value = instance[tr.feature]
     if value > tr.threshold:
         return predict(instance, tr.left_node)
     else: return predict(instance, tr.right_node)
 
-
-
-def best_split(x: np.ndarray, y: np.ndarray, minleaf: int) -> dict:
+def best_split(x: np.ndarray, y: np.ndarray, minleaf: int, feature_idx: np.ndarray) -> dict:
     split = {}
     best_gain = -1
     x = np.column_stack((x, y.T))
 
-    for index in range(x.shape[1]-1):
+    for index in feature_idx:
         features = x[:, index]
         features = np.unique(features)
         features = [np.mean(features[i:i+2]) for i in range(0, len(features)-1)]
@@ -103,6 +121,12 @@ def best_split(x: np.ndarray, y: np.ndarray, minleaf: int) -> dict:
                     best_gain = info_gain
     return split
 
+def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
+    weight_left = len(y_left) / len(y)
+    weight_right = len(y_right) / len(y)
+
+    gain = gini_index(y) - (weight_left * gini_index(y_left) + weight_right * gini_index(y_right))
+    return gain
 
 def gini_index(y: np.ndarray) -> float:
     """Two-class gini index impurity measure, i.e.: i(t) = p(0|t)p(1|t) = p(0|t)(1-p(0|t)).
@@ -119,15 +143,6 @@ def gini_index(y: np.ndarray) -> float:
         return 0
 
     return counts[0] * counts[1]
-
-
-def quality_of_split(y: np.ndarray, y_left: np.ndarray, y_right: np.ndarray):
-    weight_left = len(y_left) / len(y)
-    weight_right = len(y_right) / len(y)
-
-    gain = gini_index(y) - (weight_left * gini_index(y_left) + weight_right * gini_index(y_right))
-    return gain
-
 
 class Tree:
     def __init__(self):
@@ -176,17 +191,26 @@ def read_data(text_file: str):
 data = read_data('data/pima.txt')
 #data = read_data('data/credit.txt')
 
+
 x = np.delete(data, np.s_[-1:], axis=1)
 y = data[:, -1]
 
-# create tree object
-tree = Tree()
+def run_algo(forrest=True):
+    if(forrest):
+        # create tree object
+        tree = Tree()
 
-# run it
-tree.run(x, y, 20, 5, 8)
-tree.print_tree()
+        # run it
+        tree.run(x, y, 20, 5, 8)
+        tree.print_tree()
 
-#make predictions
-preds = tree_pred(data, tree.root)
+        #make predictions
+        preds = tree_pred(data, tree.root)
 
-print(confusion_matrix(y, preds))
+        print(confusion_matrix(y, preds), accuracy_score(y, preds))
+    else:
+        lst = tree_grow_b(x,y,20,5,8, 27)
+        preds = tree_pred_b(x, lst)
+        print(confusion_matrix(y, preds), accuracy_score(y, preds))
+
+run_algo(forrest=False)
