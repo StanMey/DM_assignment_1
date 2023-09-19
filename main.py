@@ -1,11 +1,11 @@
 from collections import Counter
-from typing import List
+from sklearn.metrics import confusion_matrix
+from typing import List, Union, Tuple
 
 import numpy as np
 
 
-##### The Tree object #####
-
+##### Helper functions #####
 def gini_index(t: np.ndarray) -> float:
     """Two-class gini index impurity measure, i.e.: i(t) = p(0|t)p(1|t) = p(0|t)(1-p(0|t)).
 
@@ -27,7 +27,37 @@ def gini_index(t: np.ndarray) -> float:
     return t1_freq * t2_freq
 
 
+##### The Tree and Node classes #####
+class Node:
+    """The Node object containing information about either a decision or leaf.
+    """
+    def __init__(self, feature: int=None, threshold: float=None, left=None, right=None, value: str=None, depth:int=None) -> None:
+        """Initialisation of Node object.
+
+        :param feature: the id of the feature that was used for making a decision, defaults to None
+        :type feature: int, optional
+        :param threshold: The threshold of the decision, defaults to None
+        :type threshold: float, optional
+        :param left: If this Node is a decision Node this holds information about the Node connected the left side, defaults to None
+        :type left: Node, optional
+        :param right: If this Node is a decision Node this holds information about the Node connected the right side, defaults to None
+        :type right: Node, optional
+        :param value: The value of of the majority class for the leaf Node, defaults to None
+        :type value: str, optional
+        :param depth: The depth of the current Node, defaults to None
+        :type depth: int, optional
+        """
+        self.feature_index = feature
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value
+        self.depth = depth
+
+
 class Tree:
+    """The Tree object containing the classification tree.
+    """
     def __init__(self, nmin: int, minleaf: int, nfeat: int) -> None:
         """Initialisation of Tree object.
 
@@ -35,7 +65,7 @@ class Tree:
         :type nmin: int
         :param minleaf: Minimum number of observations required for a leaf node.
         :type minleaf: int
-        :param nfeat: Minimal number of features considered for each
+        :param nfeat: Minimal number of features considered for each.
         :type nfeat: int
         """
         # initialize the root
@@ -47,13 +77,25 @@ class Tree:
         self.nfeat = nfeat
 
     
-    def build_tree(self, features, labels):
+    def build_tree(self, features: np.ndarray, labels: np.ndarray, depth: int=0) -> Node:
+        """A recursive function which builds the Tree by recursively adding new decision and leaf Nodes.
+
+        :param features: 2-dimensional data matrix containing attribute values.
+        :type features: np.ndarray
+        :param labels: Vector of class labels.
+        :type labels: np.ndarray
+        :param depth: The depth of the current Node (this is mainly used for printing the tree), defaults to 0
+        :type depth: int, optional
+        :return: Returns either a decision or leaf Node.
+        :rtype: Node
+        """
         
         n_samples, n_features = features.shape
+        parent_gain = gini_index(labels)
 
-        # check the stopping criteria (nmin)
-        if n_samples < self.nmin:
-            # the node contains not enough observations to split so becomes a leaf Node
+        # check the stopping criteria (nmin) and check whether we have an optimal split
+        if n_samples < self.nmin or parent_gain <= 0.0:
+            # the node contains not enough observations to split or is already perfectly split, so becomes a leaf Node
             leaf_value = self._find_most_common(labels)
             return Node(value=leaf_value)
         
@@ -61,11 +103,9 @@ class Tree:
         features_idx = np.random.choice(np.arange(0, n_features), self.nfeat, replace=False)
 
         # find the best split
-        parent_gain = gini_index(labels)
         _, feature_idx, threshold = self.find_best_split(features_idx, features, labels, parent_gain)
-        print(feature_idx, threshold)
         
-        if not feature_idx:
+        if feature_idx is None:
             # the minleaf constraint was violated, so make this Node a leaf node
             leaf_value = self._find_most_common(labels)
             return Node(value=leaf_value)
@@ -83,7 +123,20 @@ class Tree:
         return Node(feature_idx, threshold, left_branch, right_branch)
 
 
-    def find_best_split(self, features_idx, features, labels, p_gain):
+    def find_best_split(self, features_idx: np.ndarray, features: np.ndarray, labels: np.ndarray, p_gain: float) -> Union[Tuple[float, int, float], Tuple[None, None, None]]:
+        """Finds the best split based on the selected features the minleaf constraint.
+
+        :param features_idx: The id's of the features that can be considered for the current split.
+        :type features_idx: np.ndarray
+        :param features: 2-dimensional data matrix containing attribute values.
+        :type features: np.ndarray
+        :param labels: Vector of class labels.
+        :type labels: np.ndarray
+        :param p_gain: The impurity of the parent Node.
+        :type p_gain: float
+        :return: Either returns the best split found or None if the minleaf constraint couldn't be satisfied.
+        :rtype: Union[Tuple[float, int, float], Tuple[None, None, None]]
+        """
         gains = []
 
         for feature_id in features_idx:
@@ -119,18 +172,16 @@ class Tree:
             return None, None, None
 
 
-    def _find_most_common(self, labels):
+    def _find_most_common(self, labels: np.ndarray) -> int:
+        """Finds the majority label based on the labels.
+
+        :param labels: Vector of class labels.
+        :type labels: np.ndarray
+        :return: Returns the majority label found in the vector.
+        :rtype: int
+        """
         counter = Counter(labels)
         return counter.most_common(1)[0][0]
-
-
-class Node:
-    def __init__(self, feature: int=None, threshold: float=None, left=None, right=None, value: str=None):
-        self.feature_index = feature
-        self.threshold = threshold
-        self.left = left
-        self.right = right
-        self.value = value
 
 
 ##### The two main functions #####
@@ -139,13 +190,13 @@ def tree_grow(x: np.ndarray, y: np.ndarray, nmin: int, minleaf: int, nfeat: int)
 
     :param x: 2-dimensional data matrix containing attribute values.
     :type x: np.ndarray
-    :param y: Vector of class labels
+    :param y: Vector of class labels.
     :type y: np.ndarray
     :param nmin: Number of observations that a node must contain at least, for it to be allowed to split.
     :type nmin: int
     :param minleaf: Minimum number of observations required for a leaf node.
     :type minleaf: int
-    :param nfeat: Minimal number of features considered for each
+    :param nfeat: Minimal number of features considered for each.
     :type nfeat: int
     :return: Grown and fertilized tree predicting new cases.
     :rtype: Tree
@@ -168,9 +219,10 @@ def tree_pred(x: np.ndarray, tr: Tree) -> np.ndarray:
     predictions = []
 
     for features in x:
+        # go over every data point in the dataset
         current_node = tr.root
 
-        while not current_node.value:
+        while current_node.value is None:
             # as long as the current node doesn't have a value, just continue down the rabbit hole
             if features[current_node.feature_index] <= current_node.threshold:
                 current_node = current_node.left
@@ -186,10 +238,20 @@ def tree_pred(x: np.ndarray, tr: Tree) -> np.ndarray:
 ##### The two auxiliary functions (for bagging and random forest) #####
 
 
+
 if __name__ == "__main__":
-    data = np.loadtxt('./data/credit.txt', delimiter=",")
-    
+    # check on credit dataset
+    # data = np.loadtxt('./data/credit.txt', delimiter=",")
+    # X = data[:,:-1]
+    # y = data[:, -1].astype(int)
+    # tree = tree_grow(X, y, 2, 1, X.shape[1])
+
+    # check on prima dataset
+    data = np.loadtxt('./data/pima.txt', delimiter=",")
     X = data[:,:-1]
     y = data[:, -1].astype(int)
-    
-    tree = tree_grow(X, y, 2, 1, X.shape[1])
+    tree = tree_grow(X, y, 20, 5, X.shape[1])
+
+    # make the predictions
+    preds = tree_pred(X, tree)
+    print(confusion_matrix(y, preds))
