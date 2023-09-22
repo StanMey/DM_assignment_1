@@ -248,7 +248,6 @@ def tree_pred(x: np.ndarray, tr: Tree) -> np.ndarray:
     for features in x:
         # go over every data point in the dataset
         current_node = tr.root
-        print(current_node.depth)
 
         while current_node.value is None:
             # as long as the current node doesn't have a value, just continue down the rabbit hole
@@ -328,7 +327,6 @@ if __name__ == "__main__":
     X = data[:,:-1]
     y = data[:, -1].astype(int)
     tree = tree_grow(X, y, 2, 1, X.shape[1])
-
     print(print_tree(tree.root, 2))
 
     # check on prima dataset with single tree
