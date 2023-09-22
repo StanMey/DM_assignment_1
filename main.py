@@ -31,7 +31,7 @@ def gini_index(t: np.ndarray) -> float:
 class Node:
     """The Node object containing information about either a decision or leaf.
     """
-    def __init__(self, feature: int=None, threshold: float=None, left=None, right=None, value: str=None, depth:int=None) -> None:
+    def __init__(self, feature: int=None, threshold: float=None, left=None, right=None, value: str=None, depth:int=None, y_dist: np.ndarray=None) -> None:
         """Initialisation of Node object.
 
         :param feature: the id of the feature that was used for making a decision, defaults to None
@@ -46,6 +46,8 @@ class Node:
         :type value: str, optional
         :param depth: The depth of the current Node, defaults to None
         :type depth: int, optional
+        :param y_dist: The distribution of the y values on the leaf node (this is mainly used when printing the tree)
+        :type y_dist: np.ndarray, optional
         """
         self.feature_index = feature
         self.threshold = threshold
@@ -53,9 +55,19 @@ class Node:
         self.right = right
         self.value = value
         self.depth = depth
+        self.y_dist = y_dist
 
 
-def print_tree(node: Node, max_depth: int):
+def print_tree(node: Node, max_depth: int) -> str:
+    """Prints the tree, beginning from the root node of the tree.
+
+    :param node: The current node which is to be printed.
+    :type node: Node
+    :param max_depth: The maximal depth to which the tree is to be printed.
+    :type max_depth: int
+    :return: Returns a string representing the tree in textual form.
+    :rtype: str
+    """
     if node.depth == max_depth:
         return ""
     elif node.value is None:
@@ -65,7 +77,7 @@ def print_tree(node: Node, max_depth: int):
         ret += "\t" * node.depth + f"feature {node.feature_index} > {node.threshold}\n"
         ret += print_tree(node.right, max_depth)
     else:
-        ret = "\t" * node.depth + f"class: {node.value}\n"
+        ret = "\t" * node.depth + f"class: {node.value}; distr: {node.y_dist}\n"
 
     return ret
 
@@ -112,7 +124,7 @@ class Tree:
         if n_samples < self.nmin or parent_gain <= 0.0:
             # the node contains not enough observations to split or is already perfectly split, so becomes a leaf Node
             leaf_value = self._find_most_common(labels)
-            return Node(value=leaf_value, depth=depth)
+            return Node(value=leaf_value, depth=depth, y_dist=np.bincount(labels))
         
         # set the number of features to be used for this choice
         features_idx = np.random.choice(np.arange(0, n_features), self.nfeat, replace=False)
@@ -123,7 +135,7 @@ class Tree:
         if feature_idx is None:
             # the minleaf constraint was violated, so make this Node a leaf node
             leaf_value = self._find_most_common(labels)
-            return Node(value=leaf_value, depth=depth)
+            return Node(value=leaf_value, depth=depth, y_dist=np.bincount(labels))
 
         # select the features for both
         left_idxs = np.argwhere(features[:, feature_idx].flatten() <= threshold).flatten()
