@@ -44,9 +44,9 @@ class Node:
         :type right: Node, optional
         :param value: The value of of the majority class for the leaf Node, defaults to None
         :type value: str, optional
-        :param depth: The depth of the current Node, defaults to None
+        :param depth: The depth of the current Node (this is mainly used for printing the tree), defaults to None
         :type depth: int, optional
-        :param y_dist: The distribution of the y values on the leaf node (this is mainly used when printing the tree)
+        :param y_dist: The distribution of the y values on the leaf node (this is mainly used for printing the tree)
         :type y_dist: np.ndarray, optional
         """
         self.feature_index = feature
@@ -56,6 +56,10 @@ class Node:
         self.value = value
         self.depth = depth
         self.y_dist = y_dist
+
+        if y_dist is not None and y_dist.shape[0] == 1:
+        # we only have one unique label so add a 0 so the gini index gets calculated the right way
+            self.y_dist = np.append(self.y_dist, [0])
 
 
 def print_tree(node: Node, max_depth: int) -> str:
@@ -323,21 +327,21 @@ def tree_pred_b(x: np.ndarray, tr: List[Tree]) -> np.ndarray:
 
 if __name__ == "__main__":
     # check on credit dataset
-    data = np.loadtxt('./data/credit.txt', delimiter=",")
-    X = data[:,:-1]
-    y = data[:, -1].astype(int)
-    tree = tree_grow(X, y, 2, 1, X.shape[1])
-    print(print_tree(tree.root, 2))
-
-    # check on prima dataset with single tree
-    # data = np.loadtxt('./data/pima.txt', delimiter=",")
+    # data = np.loadtxt('./data/credit.txt', delimiter=",")
     # X = data[:,:-1]
     # y = data[:, -1].astype(int)
-    # tree = tree_grow(X, y, 20, 5, X.shape[1])
+    # tree = tree_grow(X, y, 2, 1, X.shape[1])
+    # print(print_tree(tree.root, 4))
 
-    # # make the predictions
-    # preds = tree_pred(X, tree)
-    # print(confusion_matrix(y, preds))
+    # check on prima dataset with single tree
+    data = np.loadtxt('./data/pima.txt', delimiter=",")
+    X = data[:,:-1]
+    y = data[:, -1].astype(int)
+    tree = tree_grow(X, y, 20, 5, X.shape[1])
+
+    # make the predictions
+    preds = tree_pred(X, tree)
+    print(confusion_matrix(y, preds))
 
     # check on prima dataset with random forests
     # data = np.loadtxt('./data/pima.txt', delimiter=",")
