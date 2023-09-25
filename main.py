@@ -75,10 +75,10 @@ def print_tree(node: Node, max_depth: int) -> str:
     if node.depth == max_depth:
         return ""
     elif node.value is None:
-        ret = "\t" * node.depth + f"feature {node.feature_index} <= {node.threshold}\n"
+        ret = "\t" * node.depth + f"feature {node.feature_index} <= {node.threshold}; distr: {node.y_dist}\n"
         ret += print_tree(node.left, max_depth)
 
-        ret += "\t" * node.depth + f"feature {node.feature_index} > {node.threshold}\n"
+        ret += "\t" * node.depth + f"feature {node.feature_index} > {node.threshold}; distr: {node.y_dist}\n"
         ret += print_tree(node.right, max_depth)
     else:
         ret = "\t" * node.depth + f"class: {node.value}; distr: {node.y_dist}\n"
@@ -151,7 +151,7 @@ class Tree:
         # go down one branch and create the child nodes
         left_branch = self.build_tree(left_features, left_labels, depth=depth + 1)
         right_branch = self.build_tree(right_features, right_labels, depth=depth + 1)
-        return Node(feature_idx, threshold, left_branch, right_branch, depth=depth)
+        return Node(feature_idx, threshold, left_branch, right_branch, depth=depth, y_dist=np.bincount(labels))
 
 
     def find_best_split(self, features_idx: np.ndarray, features: np.ndarray, labels: np.ndarray, p_gain: float) -> Union[Tuple[float, int, float], Tuple[None, None, None]]:
@@ -316,7 +316,6 @@ def tree_pred_b(x: np.ndarray, tr: List[Tree]) -> np.ndarray:
 
     # get all predictions for each tree
     for tree in tr:
-
         trees_pred = tree_pred(x, tree)
         predictions.append(trees_pred)
 
@@ -327,28 +326,18 @@ def tree_pred_b(x: np.ndarray, tr: List[Tree]) -> np.ndarray:
 
 if __name__ == "__main__":
     # check on credit dataset
-    # data = np.loadtxt('./data/credit.txt', delimiter=",")
-    # X = data[:,:-1]
-    # y = data[:, -1].astype(int)
-    # tree = tree_grow(X, y, 2, 1, X.shape[1])
-    # print(print_tree(tree.root, 4))
-
-    # check on prima dataset with single tree
-    data = np.loadtxt('./data/pima.txt', delimiter=",")
+    data = np.loadtxt('./data/credit.txt', delimiter=",")
     X = data[:,:-1]
     y = data[:, -1].astype(int)
-    tree = tree_grow(X, y, 20, 5, X.shape[1])
+    tree = tree_grow(X, y, 2, 1, X.shape[1])
+    print(print_tree(tree.root, 4))
 
-    # make the predictions
-    preds = tree_pred(X, tree)
-    print(confusion_matrix(y, preds))
-
-    # check on prima dataset with random forests
+    # check on prima dataset with single tree
     # data = np.loadtxt('./data/pima.txt', delimiter=",")
     # X = data[:,:-1]
     # y = data[:, -1].astype(int)
-    # trees = tree_grow_b(X, y, 20, 5, X.shape[1], 10)
+    # tree = tree_grow(X, y, 20, 5, X.shape[1])
 
     # # make the predictions
-    # preds = tree_pred_b(X, trees)
+    # preds = tree_pred(X, tree)
     # print(confusion_matrix(y, preds))
