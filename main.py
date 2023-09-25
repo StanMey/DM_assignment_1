@@ -62,7 +62,7 @@ class Node:
             self.y_dist = np.append(self.y_dist, [0])
 
 
-def print_tree(node: Node, max_depth: int) -> str:
+def print_tree(node: Node, max_depth: int, columns: list=None) -> str:
     """Prints the tree, beginning from the root node of the tree.
 
     :param node: The current node which is to be printed.
@@ -75,11 +75,11 @@ def print_tree(node: Node, max_depth: int) -> str:
     if node.depth == max_depth:
         return ""
     elif node.value is None:
-        ret = "\t" * node.depth + f"feature {node.feature_index} <= {node.threshold}; distr: {node.y_dist}\n"
-        ret += print_tree(node.left, max_depth)
+        ret = "\t" * node.depth + f"feature: {columns[node.feature_index] if columns else node.feature_index} <= {node.threshold}; distr: {node.y_dist}\n"
+        ret += print_tree(node.left, max_depth, columns)
 
-        ret += "\t" * node.depth + f"feature {node.feature_index} > {node.threshold}; distr: {node.y_dist}\n"
-        ret += print_tree(node.right, max_depth)
+        ret += "\t" * node.depth + f"feature: {columns[node.feature_index] if columns else node.feature_index} > {node.threshold}; distr: {node.y_dist}\n"
+        ret += print_tree(node.right, max_depth, columns)
     else:
         ret = "\t" * node.depth + f"class: {node.value}; distr: {node.y_dist}\n"
 
@@ -330,7 +330,8 @@ if __name__ == "__main__":
     X = data[:,:-1]
     y = data[:, -1].astype(int)
     tree = tree_grow(X, y, 2, 1, X.shape[1])
-    print(print_tree(tree.root, 4))
+    cols = ['age', 'married', 'house', 'income', 'gender', 'class']
+    print(print_tree(tree.root, 4, cols))
 
     # check on prima dataset with single tree
     # data = np.loadtxt('./data/pima.txt', delimiter=",")
