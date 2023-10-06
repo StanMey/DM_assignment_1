@@ -325,20 +325,12 @@ def tree_pred_b(x: np.ndarray, tr: List[Tree]) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    # check on credit dataset
-    data = np.loadtxt('./data/credit.txt', delimiter=",")
+    # check on prima dataset with single tree
+    data = np.loadtxt('./data/pima.txt', delimiter=",")
     X = data[:,:-1]
     y = data[:, -1].astype(int)
-    tree = tree_grow(X, y, 2, 1, X.shape[1])
-    cols = ['age', 'married', 'house', 'income', 'gender', 'class']
-    print(print_tree(tree.root, 4, cols))
+    tree = tree_grow(X, y, 20, 5, X.shape[1])
 
-    # check on prima dataset with single tree
-    # data = np.loadtxt('./data/pima.txt', delimiter=",")
-    # X = data[:,:-1]
-    # y = data[:, -1].astype(int)
-    # tree = tree_grow(X, y, 20, 5, X.shape[1])
-
-    # # make the predictions
-    # preds = tree_pred(X, tree)
-    # print(confusion_matrix(y, preds))
+    # make the predictions
+    preds = tree_pred(X, tree)
+    print(confusion_matrix(y, preds))
